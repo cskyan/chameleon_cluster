@@ -1,6 +1,7 @@
 from graphtools import *
 import itertools
 import pandas as pd
+from sklearn.base import BaseEstimator, ClusterMixin
 
 
 def internal_interconnectivity(graph, cluster):
@@ -77,22 +78,40 @@ def merge_best(graph, df, a, k, verbose=False):
     return max_score > 0
 
 
-def cluster(df, k, knn=10, m=30, alpha=2.0, verbose=False, plot=False):
-    graph = knn_graph(df, knn, verbose=True)
+def cluster(df, n_clusters, knn_params=dict(n_neighbors=10, metric='euclidean', n_jobs=1), m=30, alpha=2.0, verbose=False, plot=False):
+    graph = knn_graph(df, knn_params, verbose=True)
     graph = pre_part_graph(graph, m, df, verbose=True)
-    iterm = tqdm(enumerate(range(m - k)), total=m-k)
+    iterm = tqdm(enumerate(range(m - n_clusters)), total=m-n_clusters)
     for i in iterm:
-        merge_best(graph, df, alpha, k, verbose)
+        merge_best(graph, df, alpha, n_clusters, verbose)
         if plot:
             plot2d_data(df)
     res = rebuild_labels(df)
     return res
 
-def rebuild_labels(df):
+def rebuild_labels(df, offset=0):
     ans = df.copy()
     clusters = list(pd.DataFrame(df['cluster'].value_counts()).index)
-    c = 1
+    c = offset
     for i in clusters:
         ans.loc[df['cluster'] == i, 'cluster'] = c
         c = c + 1
     return ans
+
+
+class Chameleon(ClusterMixin, BaseEstimator):
+    def __init__(self, n_clusters=8, m=30, alpha=2.0, knn_neighbors=20, metric='minkowski', p=2, metric_params=None, n_jobs=None, verbose=False):
+        self.n_clusters = n_clusters
+        self.m = m
+        self.alpha = alpha
+        self.knn_params = dict(n_neighbors=knn_neighbors, mode='connectivity', metric=metric, p=p, metric_params=metric_params, include_self='auto', n_jobs=n_jobs)
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+
+    def fit(self, X, y=None):
+        res = cluster(pd.DataFrame(X), n_clusters=self.n_clusters, knn_params=self.knn_params, m=self.m, alpha=self.alpha, verbose=self.verbose, plot=False)
+        self.labels_ = res['cluster'].values
+        return self
+
+    def fit_predict(self, X, y=None):
+        return super().fit_predict(X, y)
