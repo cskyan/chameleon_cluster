@@ -7,18 +7,18 @@ from visualization import *
 import metis
 
 
-def euclidean_distance(a, b):
-    return np.linalg.norm(np.array(a) - np.array(b))
-
-
 def knn_graph(df, knn_params=dict(n_neighbors=2, metric="euclidean"), verbose=False):
-    points = [p[1:] for p in df.itertuples()]
-    knn_params["mode"] = "distance"
-    if verbose:
-        print("Building kNN graph (k = %d)..." % (knn_params.setdefault("n_neighbors", 2)))
-    A = kneighbors_graph(points, **knn_params)
-    g = nx.from_scipy_sparse_matrix(A)
-    nx.set_node_attributes(g, {n: {"pos": points[i]} for i, n in enumerate(g.nodes())})
+    if knn_params.setdefault('metric', "euclidean") == 'precomputed':
+        g = nx.from_scipy_sparse_matrix(knn_params['distance'])
+    else:
+        points = [p[1:] for p in df.itertuples()]
+        knn_params["mode"] = "distance"
+        knn_params["n_neighbors"] = min(knn_params["n_neighbors"], df.shape[0]-1)
+        if verbose:
+            print("Building kNN graph (k = %d)..." % (knn_params.setdefault("n_neighbors", 2)))
+        A = kneighbors_graph(points, **knn_params)
+        g = nx.from_scipy_sparse_matrix(A)
+        nx.set_node_attributes(g, {n: {"pos": points[i]} for i, n in enumerate(g.nodes())})
     g.graph["edge_weight_attr"] = "similarity"
     return g
 

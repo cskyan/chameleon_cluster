@@ -1,5 +1,5 @@
 from graphtools import *
-import itertools
+import copy, itertools
 import pandas as pd
 from sklearn.base import BaseEstimator, ClusterMixin
 
@@ -79,8 +79,8 @@ def merge_best(graph, df, a, k, verbose=False):
 
 
 def cluster(df, n_clusters, knn_params=dict(n_neighbors=10, metric='euclidean', n_jobs=1), m=30, alpha=2.0, verbose=False, plot=False):
-    graph = knn_graph(df, knn_params, verbose=True)
-    graph = pre_part_graph(graph, m, df, verbose=True)
+    graph = knn_graph(df, knn_params, verbose=verbose)
+    graph = pre_part_graph(graph, m, df, verbose=verbose)
     iterm = tqdm(enumerate(range(m - n_clusters)), total=m-n_clusters)
     for i in iterm:
         merge_best(graph, df, alpha, n_clusters, verbose)
@@ -109,7 +109,11 @@ class Chameleon(ClusterMixin, BaseEstimator):
         self.verbose = verbose
 
     def fit(self, X, y=None):
-        res = cluster(pd.DataFrame(X), n_clusters=self.n_clusters, knn_params=self.knn_params, m=self.m, alpha=self.alpha, verbose=self.verbose, plot=False)
+        knn_params = copy.deepcopy(self.knn_params)
+        if self.knn_params['metric'] == 'precomputed':
+            knn_params['distance'] = X
+            X = np.arange(X.shape[0]).reshape((X.shape[0], 1))
+        res = cluster(pd.DataFrame(X), n_clusters=self.n_clusters, knn_params=knn_params, m=self.m, alpha=self.alpha, verbose=self.verbose, plot=False)
         self.labels_ = res['cluster'].values
         return self
 
